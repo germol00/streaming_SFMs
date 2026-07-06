@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "streaming_SFMs"
+version = "0.1"
+requires-python = ">=3.10.12"
+dependencies = [
+		"transformers",
+		"accelerate",
+		"omegaconf",
+		"torch",
+		"levenshtein",
+		"tqdm",
+		"evaluate",
+		"scipy",
+		"scikit-learn",
+		"networkx",
+]
+
+description = "Small toolkit for streaming ASR with SFMs"
+readme = "README.md"
+keywords = ["Automatic Speech Recognition", "ASR", "Foundation Models", "SFM"]
+authors = [
+	{name="Gerard Mas Mollà", email="gemamol@upv.es"}
+]
+classifiers = [
+	"Development Status :: 1 - Planning",
+	"Intended Audience :: Science/Research",
+	"Programming Language :: Python :: 3",
+	"Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/germol00/streaming_SFMs"
