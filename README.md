@@ -2,7 +2,7 @@
 
 **streaming_SFMs** is a small toolkit for streaming automatic speech recognition (ASR) with speech foundation models. It provides the reference implementation for the experiments in [*Improving streaming ASR with foundation models using emission policies*](https://www.isca-archive.org/interspeech_2026/masmolla26_interspeech.pdf).
 
-The toolkit turns offline ASR models into a streaming pipeline by decoding audio over a sliding window, recovering token timestamps, and applying emission policies that decide when partial hypotheses can be committed.
+The toolkit turns offline ASR models into a streaming pipeline by decoding audio over a sliding window, recovering token timestamps, and applying emission policies.
 
 ## Features
 
@@ -29,14 +29,6 @@ With [uv](https://github.com/astral-sh/uv):
 ```bash
 uv pip install .
 ```
-
-For development (editable install and optional dev dependencies):
-
-```bash
-pip install -e ".[dev]"
-```
-
-Installing from the repository pulls in the dependencies listed in `pyproject.toml`, including a compatible NeMo ASR stack.
 
 ## Quickstart
 
