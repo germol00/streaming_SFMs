@@ -1,6 +1,6 @@
 # streaming_SFMs
 
-**streaming_SFMs** is a small toolkit for streaming automatic speech recognition (ASR) with speech foundation models. It provides the reference implementation of the streaming ASR system introduced in [*Streaming Speech Foundation Models with Latency Controllable Emission Policies*](https://www.isca-archive.org/interspeech_2026/masmolla26_interspeech.pdf) (Interspeech 2026).
+**streaming_SFMs** is a small toolkit for streaming automatic speech recognition (ASR) with speech foundation models. It provides the reference implementation for the experiments in [*Improving streaming ASR with foundation models using emission policies*](https://www.isca-archive.org/interspeech_2026/masmolla26_interspeech.pdf).
 
 The toolkit turns offline ASR models into a streaming pipeline by decoding audio over a sliding window, recovering token timestamps, and applying emission policies that decide when partial hypotheses can be committed.
 
