@@ -32,10 +32,10 @@ uv pip install .
 
 ## Quickstart
 
-Run the example script on a NeMo-style JSONL manifest (each line needs at least `audio_filepath`; `text` is optional and only used for display):
+Run the example script on a NeMo-style JSONL manifest (each line needs at least `audio_filepath`):
 
 ```bash
-python prova.py --pretrained_name nvidia/parakeet-tdt-0.6b-v3 --manifest_path vp.jsonl
+python prova.py --pretrained_name nvidia/parakeet-tdt-0.6b-v3 --manifest_path manifest.jsonl
 ```
 
 Or use the library API directly:
