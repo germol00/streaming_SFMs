@@ -17,6 +17,8 @@ dependencies = [
 		"scipy",
 		"scikit-learn",
 		"networkx",
+		"librosa",
+		"nemo-toolkit[asr]"
 ]
 
 description = "Small toolkit for streaming ASR with SFMs"
