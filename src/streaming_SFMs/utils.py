@@ -1,3 +1,8 @@
+from nemo.collections.asr.parts.utils.timestamp_utils import (
+    get_forced_aligned_timestamps_with_external_model,
+    process_aed_timestamp_outputs,
+)
+
 def _transcribe_output_processing2(self, outputs, trcfg):
     """
     Internal function to process the model's outputs to return the results to the user. This function is called by
