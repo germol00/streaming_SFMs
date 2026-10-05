@@ -18,9 +18,8 @@ from .utils import _transcribe_output_processing2
 import logging
 logger = logging.getLogger(__name__)
 
-from streaming_sfm import LOG_LEVEL
+from streaming_SFMs import LOG_LEVEL
 logger.setLevel(LOG_LEVEL)
-
 
 class StreamingBatchedAudioBufferWithOffset(StreamingBatchedAudioBuffer):
     def add_audio_batch_get_stride(
@@ -64,7 +63,7 @@ class StreamingBatchedAudioBufferWithOffset(StreamingBatchedAudioBuffer):
         return (len(self.samples), len(self.samples[0]))
 
 class BaseStreamingModel():
-    def __init__(self, cfg, mbr):
+    def __init__(self, cfg):
         self.cfg = cfg
         self.device = get_inference_device(cuda=cfg.cuda, allow_mps=cfg.allow_mps)
         self.dtype = get_inference_dtype(cfg.compute_dtype, device=self.device)
@@ -81,27 +80,6 @@ class BaseStreamingModel():
         self.encoder_frame2audio_samples = int(self.sample_rate * self.feature_stride_sec) * self.subsampling_factor
 
         self.context_samples = self._compute_context(cfg)
-
-        if mbr:
-            try:
-                from streaming_sfm import mbr
-                from mbrs.decoders import get_decoder
-                from mbrs.metrics import get_metric
-
-                decoder_class = get_decoder("mbr")
-                metric_class = get_metric("fastwer")
-                metric_cfg = metric_class.Config()
-                metric = metric_class(metric_cfg)
-                decoder_cfg = decoder_class.Config()
-                self.mbr = decoder_class(decoder_cfg, metric)
-                logger.debug("MBR: Active")
-            except Exception as e:
-                self.mbr = None
-                logger.error(f"MBR: Not found (could not import) {e}")
-                exit(-1)
-        else:
-            logger.debug("MBR: Deactivated")
-            self.mbr = None
 
     def _compute_context(self, cfg):
         """Returns the context size in samples for left, right and current chunk contexts"""
@@ -160,12 +138,10 @@ class BaseStreamingModel():
             )
             current_offset += (stride // self.encoder_frame2audio_samples)
 
-            # Call the model-specific implementation
             formatted_hyp = self.process_chunk(buffer, current_offset)
 
             hyp_buffer.insert(formatted_hyp)
 
-            # Policy flushing
             if self.cfg.policy == 'WaitK':
                 out = hyp_buffer.flush(last_instant=left_sample // self.encoder_frame2audio_samples)
             else:
@@ -179,19 +155,28 @@ class BaseStreamingModel():
         return " ".join([t for _, _, t in committed_results])
 
 class StreamingParakeet(BaseStreamingModel):
-    def __init__(self, cfg, mbr=False):
-        super().__init__(cfg, mbr)
+    def __init__(self, cfg):
+        super().__init__(cfg)
 
+        # Timestamps require alignments + TDT durations to be preserved during decoding.
+        # These flags must be applied via change_decoding_strategy on the *model decoding*
+        # config — not the user/script cfg (chunk_secs, policy, ...).
         with open_dict(self.asr_model.cfg.decoding):
             self.asr_model.cfg.decoding.greedy.preserve_alignments = True
-            self.asr_model.cfg.decoding.beam.preserve_alignments = True
             self.asr_model.cfg.decoding.tdt_include_token_duration = True
-        
-        with open_dict(self.asr_model.cfg.decoding):
-            cfg = OmegaConf.merge(self.asr_model.cfg.decoding, cfg.rnnt_decoding)
-        
-        self.asr_model.change_decoding_strategy(OmegaConf.create(cfg))
-        #self.asr_model.change_decoding_strategy(self.asr_model.cfg.decoding)
+
+        decoding_cfg = self.asr_model.cfg.decoding
+        rnnt_decoding = OmegaConf.select(cfg, "rnnt_decoding", default=None)
+        if rnnt_decoding is not None:
+            decoding_cfg = OmegaConf.merge(decoding_cfg, rnnt_decoding)
+
+        strategy = OmegaConf.select(decoding_cfg, "strategy", default="greedy_batch")
+        if strategy != "greedy_batch":
+            raise ValueError(
+                f"Only decoding strategy 'greedy_batch' is supported, got '{strategy}'."
+            )
+
+        self.asr_model.change_decoding_strategy(OmegaConf.create(decoding_cfg))
 
     def process_chunk(self, buffer, current_offset):
         # Forward pass through encoder
@@ -201,46 +186,12 @@ class StreamingParakeet(BaseStreamingModel):
         )
         encoder_output = encoder_output.transpose(1, 2)
 
-        logger.debug(self.asr_model.cfg.decoding.strategy)
-        if self.asr_model.cfg.decoding.strategy == "greedy_batch":
-            logger.debug("Decoding strategy: greedy_batch")
-            chunk_batched_hyps, _, _ = self.asr_model.decoding.decoding.decoding_computer(
-                x=encoder_output, out_len=encoder_output_len, prev_batched_state=None
-            )
-            unbatched_hyp = batched_hyps_to_hypotheses(chunk_batched_hyps)[0]
-            timestamped_hyp = self.asr_model.decoding.compute_rnnt_timestamps(unbatched_hyp)
-            toks = self.asr_model.decoding.decode_ids_to_tokens(timestamped_hyp.y_sequence.tolist())
-        elif self.asr_model.cfg.decoding.strategy == "malsd_batch":
-            #need this pull request: pip install "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@refs/pull/15411/head"
-            chunk_batched_hyps = self.asr_model.decoding.decoding._decoding_computer(
-                x=encoder_output, out_len=encoder_output_len
-            )
-            logger.debug(chunk_batched_hyps)
-            logger.debug(f"Decoding strategy: masld_batch {self.mbr}=")
-            if self.mbr:
-                hyps = []
-                hyps_toks = []
-                timestamp_hyps = []
-                for hyp in chunk_batched_hyps.to_nbest_hyps_list()[0].n_best_hypotheses:
-                    unbatched_hyp = hyp
-                    timestamped_hyp = self.asr_model.decoding.compute_rnnt_timestamps(unbatched_hyp)
-                    toks = self.asr_model.decoding.decode_ids_to_tokens(timestamped_hyp.y_sequence.tolist())
-                    text = self.asr_model.tokenizer.tokens_to_text(toks)
-                    hyps.append(text)
-                    timestamp_hyps.append(timestamped_hyp)
-                    hyps_toks.append(toks)
-                refs = hyps
-                logger.debug(hyps)
-                mbrs_rescored = self.mbr.decode(hyps, refs, nbest=1)
-                logger.debug(mbrs_rescored)
-                mbr_best_idx = mbrs_rescored.idx[0]
-                timestamped_hyp = timestamp_hyps[mbr_best_idx]
-                toks = hyps_toks[mbr_best_idx]
-            else:
-                unbatched_hyp = chunk_batched_hyps.to_hyps_list()[0]
-                timestamped_hyp = self.asr_model.decoding.compute_rnnt_timestamps(unbatched_hyp)
-                toks = self.asr_model.decoding.decode_ids_to_tokens(timestamped_hyp.y_sequence.tolist())
-                logger.debug(self.asr_model.tokenizer.tokens_to_text(toks))
+        chunk_batched_hyps, _, _ = self.asr_model.decoding.decoding.decoding_computer(
+            x=encoder_output, out_len=encoder_output_len, prev_batched_state=None
+        )
+        unbatched_hyp = batched_hyps_to_hypotheses(chunk_batched_hyps)[0]
+        timestamped_hyp = self.asr_model.decoding.compute_rnnt_timestamps(unbatched_hyp)
+        toks = self.asr_model.decoding.decode_ids_to_tokens(timestamped_hyp.y_sequence.tolist())
 
         return [(t['start_offset'] + current_offset, t['end_offset'] + current_offset, tok)
                 for t, tok in zip(timestamped_hyp.timestamp['char'], toks)]
@@ -248,13 +199,11 @@ class StreamingParakeet(BaseStreamingModel):
 class StreamingCanary(BaseStreamingModel):
     def __init__(self, cfg):
         super().__init__(cfg)
-        # Apply the specific Canary monkey-patch for timestamps
         self.asr_model._transcribe_output_processing = types.MethodType(
-            _transcribe_output_processing_mod, self.asr_model
+            _transcribe_output_processing2, self.asr_model
         )
 
     def process_chunk(self, buffer, current_offset):
-        # Canary uses the internal .transcribe method
         batched_timestamped_hyp = self.asr_model.transcribe(
             buffer.samples[0], timestamps=True, verbose=False
         )
