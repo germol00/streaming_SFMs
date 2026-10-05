@@ -48,6 +48,7 @@ from streaming_SFMs.streaming_model import StreamingParakeet
 
 cfg = OmegaConf.create({
     "pretrained_name": "nvidia/parakeet-tdt-0.6b-v3",
+    "model_path": None,
     "chunk_secs": 1.0,
     "left_context_secs": 20.0,
     "right_context_secs": 0.0,
