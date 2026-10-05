@@ -30,16 +30,6 @@ dependencies = [
 	"nemo-toolkit[asr]>=2.7.0,<3.0.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-	"evaluate",
-	"scipy",
-	"scikit-learn",
-	"networkx",
-	"transformers",
-	"accelerate",
-]
-
 [project.urls]
 Homepage = "https://github.com/germol00/streaming_SFMs"
 
