@@ -4,7 +4,7 @@ import Levenshtein
 import logging
 logger = logging.getLogger(__name__)
 
-from streaming_sfm import LOG_LEVEL
+from streaming_SFMs import LOG_LEVEL
 logger.setLevel(LOG_LEVEL)
 
 # Punctuation marks that should not be duplicated at chunk boundaries.
