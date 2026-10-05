@@ -7,7 +7,7 @@ from omegaconf import OmegaConf, open_dict
 from tqdm import tqdm
 
 # Import your refactored classes
-from streaming_sfm.streaming_model import StreamingParakeet, StreamingCanary
+from streaming_SFMs.streaming_model import StreamingParakeet, StreamingCanary
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Streaming ASR Evaluation Script")
@@ -58,7 +58,7 @@ def main():
         print(f"--- Initializing Streaming Parakeet ---")
         streamer = StreamingParakeet(cfg)
 
-    print(streamer.model.encoder_subsampling_factor)
+    #print(streamer.asr_model.encoder_subsampling_factor)
 
     # 3. Load and Process Manifest
     with open(args.manifest_path, 'r') as f:
